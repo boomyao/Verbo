@@ -12,11 +12,11 @@ async function replaceTranscript() {
     const button = document.getElementById('__transcript-button__');
     transcriptContainer = document.createElement('div');
     transcriptContainer.id = '__transcript-container__';
-    transcriptContainer.style = "width: 100%; overflow-y: auto;";
+    transcriptContainer.style = "width: 100%; overflow-y: auto; overscroll-behavior: contain;";
     button.parentNode.insertBefore(transcriptContainer, button);
+    window.addEventListener('resize', setTranscriptContainerHeight);
   }
 
-  // 动态设置 transcriptContainer 的高度
   function setTranscriptContainerHeight() {
     const viewportHeight = window.innerHeight;
     const containerRect = transcriptContainer.getBoundingClientRect();
@@ -25,11 +25,7 @@ async function replaceTranscript() {
     transcriptContainer.style.height = `${newHeight}px`;
   }
 
-  // 初始设置高度
   setTranscriptContainerHeight();
-
-  // 监听窗口大小变化，重新设置高度
-  window.addEventListener('resize', setTranscriptContainerHeight);
 
   const video_id = location.href.split("v=")[1].split("&")[0];
   const paragraphs = await getTranscript(video_id);
@@ -45,18 +41,21 @@ async function replaceTranscript() {
         </div>`;
     }).join('');
     
-    // 添加点击事件监听器
-    transcriptContainer.querySelectorAll('.transcript-paragraph').forEach(p => {
-      p.addEventListener('click', () => {
+    transcriptContainer.addEventListener('click', (event) => {
+      const paragraph = event.target.closest('.transcript-paragraph');
+      if (paragraph) {
         const video = document.querySelector('video');
         if (video) {
-          video.currentTime = parseFloat(p.dataset.start);
+          video.currentTime = parseFloat(paragraph.dataset.start);
         }
-      });
+      }
     });
     
-    // 添加定时器以更新当前段落的样式
-    setInterval(updateCurrentParagraphStyle, 1000);
+    if (window.updateStyleInterval) {
+      clearInterval(window.updateStyleInterval);
+    }
+    
+    window.updateStyleInterval = setInterval(updateCurrentParagraphStyle, 1000);
   }
 }
 
@@ -115,7 +114,6 @@ function checkForElement() {
 
 checkForElement();
 
-// 添加这个辅助函数来格式化时间
 function formatTime(seconds) {
   if (!seconds) return '';
   const date = new Date(0);
