@@ -11,3 +11,4 @@ openai
 json_repair
 flask
 flask-cors
+youtube-transcript-api

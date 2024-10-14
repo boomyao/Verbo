@@ -93,6 +93,17 @@ def get_hotwords_from_video_info(video_info):
         hotwords = hotwords.get("hotwords", [])
     return hotwords
 
+from youtube_transcript_api import YouTubeTranscriptApi
+
+def get_transcript_from_youtube(video_id):
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return transcript
+    except Exception as e:
+        print(f"Error fetching transcript for video {video_id}: {e}")
+        return None
+
+
 if __name__ == "__main__":
   import argparse
   parser = argparse.ArgumentParser()

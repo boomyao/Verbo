@@ -90,8 +90,8 @@ Aligned Result:
 
     return lines
 
-def direct_translate_text(text):
-    client = OpenAI(api_key=os.getenv("GLM_API_KEY"), base_url=os.getenv("GLM_BASE_URL"))
+def direct_translate_text(text, model='gpt-4o-mini', base_url=None, api_key=None):
+    client = OpenAI(base_url=base_url, api_key=api_key)
     user_content = """
 Translate the following input content into Chinese:
 
@@ -106,7 +106,7 @@ Output in JSON Format:
 {text}
 """.format(text=text)
     response = client.chat.completions.create(
-        model='glm-4-plus',
+        model=model,
         messages=[
             {"role": "system", "content": 'You are a helpful assistant.'},
             {"role": "user", "content": user_content}
