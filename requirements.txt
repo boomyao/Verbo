@@ -9,3 +9,5 @@ soundfile
 requests
 openai
 json_repair
+flask
+flask-cors
