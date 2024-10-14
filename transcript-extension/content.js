@@ -12,10 +12,25 @@ async function replaceTranscript() {
     const button = document.getElementById('__transcript-button__');
     transcriptContainer = document.createElement('div');
     transcriptContainer.id = '__transcript-container__';
-    transcriptContainer.style = "width: 100%;max-height: 700px;overflow-y: auto;";
+    transcriptContainer.style = "width: 100%; overflow-y: auto;";
     button.parentNode.insertBefore(transcriptContainer, button);
   }
-  
+
+  // 动态设置 transcriptContainer 的高度
+  function setTranscriptContainerHeight() {
+    const viewportHeight = window.innerHeight;
+    const containerRect = transcriptContainer.getBoundingClientRect();
+    const containerTop = containerRect.top;
+    const newHeight = viewportHeight - containerTop;
+    transcriptContainer.style.height = `${newHeight}px`;
+  }
+
+  // 初始设置高度
+  setTranscriptContainerHeight();
+
+  // 监听窗口大小变化，重新设置高度
+  window.addEventListener('resize', setTranscriptContainerHeight);
+
   const video_id = location.href.split("v=")[1].split("&")[0];
   const paragraphs = await getTranscript(video_id);
   if (paragraphs) {
