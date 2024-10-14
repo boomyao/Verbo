@@ -1,0 +1,11 @@
+faster-whisper==1.0.1
+torch
+torchaudio
+tqdm
+ffmpeg-python
+numpy
+yt-dlp
+soundfile
+requests
+openai
+json_repair
