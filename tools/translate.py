@@ -1,9 +1,12 @@
-import os, json
+import os, json, logging
 from openai import OpenAI
 import json_repair
 import concurrent.futures
 from tqdm import tqdm
 from tools.paragraph import split_paragraphs
+
+logger = logging.getLogger(__name__)
+
 def get_transcription_lines(transcription_file, start_line=0, end_line=None):
     with open(transcription_file, "r", encoding="utf-8") as f:
         transcription = f.readlines()
@@ -87,7 +90,37 @@ Aligned Result:
 
     return lines
 
-def translate_text(text):
+def direct_translate_text(text):
+    client = OpenAI(api_key=os.getenv("GLM_API_KEY"), base_url=os.getenv("GLM_BASE_URL"))
+    user_content = """
+Translate the following input content into Chinese:
+
+## Output
+
+Output in JSON Format:
+{{
+  "translated_text": "<chinese_text>"
+}}
+
+## Input Content
+{text}
+""".format(text=text)
+    response = client.chat.completions.create(
+        model='glm-4-plus',
+        messages=[
+            {"role": "system", "content": 'You are a helpful assistant.'},
+            {"role": "user", "content": user_content}
+        ],
+        max_tokens=4095,
+        temperature=1,
+        top_p=0.7,
+        response_format={ "type": "json_object" }
+    )
+    return json_repair.loads(response.choices[0].message.content)["translated_text"]
+
+def translate_text(text, max_retry=3):
+    if len(text) < 20:
+        return direct_translate_text(text)
     client = OpenAI(api_key=os.getenv("GLM_API_KEY"), base_url=os.getenv("GLM_BASE_URL"))
     user_content = """
 You will follow a three-step translation process:
@@ -134,6 +167,7 @@ For each step of the translation process, output your results within the appropr
 
 Remember to consistently use the provided glossary for technical terms throughout your translation. Ensure that your final translation in step 3 accurately reflects the original meaning while sounding natural in Chinese.
 
+## Input Content
 {text}
 """.format(text=text)
     response = client.chat.completions.create(
@@ -145,28 +179,43 @@ Remember to consistently use the provided glossary for technical terms throughou
         max_tokens=4095,
         temperature=1,
         top_p=0.7,
-        # response_format={ "type": "json_object" }
     )
-    result = response.choices[0].message.content
-    result = result.split("<step3_refined_translation>")[1].split("</step3_refined_translation>")[0]
-    if result.startswith("\n"):
-        result = result[1:]
-    return result
+    try:
+        result = response.choices[0].message.content
+        result = result.split("<step3_refined_translation>")[1].split("</step3_refined_translation>")[0]
+        if result.startswith("\n"):
+            result = result[1:]
+        return result
+    except Exception as e:
+        if max_retry > 0:
+            logger.error(e, exc_info=True)
+            return translate_text(text, max_retry - 1)
+        else:
+            logger.error(user_content)
+            logger.error(result)
+            raise e
 
-def translate(transcription_file, paragraph_length=1000, output_file=None, max_workers=8):
+def translate(transcription_file, paragraph_length=1000, output_file=None, max_workers=10):
     transcription_lines = get_transcription_lines(transcription_file)
     paragraphs = split_paragraphs(transcription_file, transcription_lines, paragraph_length)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        tasks = [(i, paragraph["text"]) for i, paragraph in enumerate(paragraphs)]
-        future_to_task = {executor.submit(translate_text, text): (i, text) for i, text in tasks}
+        futures = []
+        for i, paragraph in enumerate(paragraphs):
+            future = executor.submit(translate_text, paragraph["text"])
+            future.paragraph_index = i
+            futures.append(future)
         
-        with tqdm(total=len(paragraphs), desc="翻译段落") as pbar:
-            for future in concurrent.futures.as_completed(future_to_task):
-                i, original_text = future_to_task[future]
-                translated_text = future.result()
-                paragraphs[i]["translated_text"] = translated_text
-                pbar.update(1)
+        with tqdm(total=len(paragraphs), desc="Translating paragraphs") as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                i = future.paragraph_index
+                try:
+                    translated_text = future.result()
+                    paragraphs[i]["translated_text"] = translated_text
+                except Exception as e:
+                    logger.error(f"Translating paragraph {i} failed: {str(e)}")
+                finally:
+                    pbar.update(1)
 
     if output_file is not None:
         with open(output_file, "w", encoding="utf-8") as f:

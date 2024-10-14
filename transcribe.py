@@ -51,7 +51,7 @@ def run_steps(yt_url: str, output_dir: str):
           "start": paragraph["lines"][0]["start"],
           "end": paragraph["lines"][-1]["end"],
           "text": paragraph["text"],
-          "translated_text": paragraph["translated_text"]
+          "translated_text": paragraph.get("translated_text", "")
         }, ensure_ascii=False) + "\n")
 
   print(f"Done")

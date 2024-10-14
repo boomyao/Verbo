@@ -28,7 +28,8 @@ def split_paragraphs_by_speaker(transcription_lines):
     current_speaker = None
     for line in transcription_lines:
         if line["speaker"] != current_speaker:
-            paragraphs.append({ "text": current_text, "lines": current_lines })
+            if current_speaker is not None:
+                paragraphs.append({ "text": current_text, "lines": current_lines })
             current_text = line["text"]
             current_lines = [line]
             current_speaker = line["speaker"]
