@@ -93,14 +93,13 @@ Aligned Result:
 def direct_translate_text(text, model='gpt-4o-mini', base_url=None, api_key=None):
     client = OpenAI(base_url=base_url, api_key=api_key)
     user_content = """
-Translate the following input content into Chinese:
+You are a translation assistant. Translate the Input Content into Chinese and output it in the <translation> tag.
 
 ## Output
 
-Output in JSON Format:
-{{
-  "translated_text": "<chinese_text>"
-}}
+<translation>
+[Insert your translation here]
+</translation>
 
 ## Input Content
 {text}
@@ -114,9 +113,13 @@ Output in JSON Format:
         max_tokens=4095,
         temperature=1,
         top_p=0.7,
-        response_format={ "type": "json_object" }
     )
-    return json_repair.loads(response.choices[0].message.content)["translated_text"]
+    result = response.choices[0].message.content
+    if result.startswith("<translation>"):
+        result = result.split("<translation>")[1].split("</translation>")[0]
+    if result.startswith("\n"):
+        result = result[1:]
+    return result
 
 def translate_text(text, max_retry=3):
     if len(text) < 20:

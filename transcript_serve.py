@@ -43,6 +43,9 @@ def get_transcript_yt(video_id):
         "text": line["text"],
     } for line in transcript]
     paragraphs = split_paragraphs_by_limit(transcription_lines)
+    for paragraph in paragraphs:
+        paragraph["start"] = paragraph["lines"][0]["start"]
+        paragraph["end"] = paragraph["lines"][-1]["end"]
 
     return paragraphs
 
