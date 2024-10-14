@@ -47,7 +47,7 @@ def split_paragraphs(transcription_file=None, transcription_lines=None, paragrap
         with open(transcription_file, encoding="utf-8") as f:
             transcription_lines = [json.loads(line) for line in f]
 
-    has_multiple_speakers = len(set([line.get("speaker", None) for line in transcription_lines])) > 1
+    has_multiple_speakers = len(set(filter(None, [line.get("speaker", None) for line in transcription_lines]))) > 1
 
     if has_multiple_speakers:
         paragraphs = split_paragraphs_by_speaker(transcription_lines)
