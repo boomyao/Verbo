@@ -23,7 +23,7 @@ class TranscriptViewer {
     this.element.className = 'verbo-transcript-viewer';
     this.paragraphs = [];
     this.lastRenderedData = '';
-    this.isUserScrolling = false;
+    this.isMouseOver = false;
   }
 
   async render() {
@@ -45,7 +45,7 @@ class TranscriptViewer {
           flex-direction: column;
           gap: 10px;
           padding: 10px;
-          font-size: 1.2rem;
+          font-size: 1.8rem;
           line-height: 1.5;
           cursor: pointer;
         }
@@ -108,13 +108,13 @@ class TranscriptViewer {
     }
     this.updateStyleInterval = setInterval(this.updateCurrentParagraphStyle.bind(this), 1000);
     
-    let scrollTimeout;
-    this.element.addEventListener('scroll', () => {
-      this.isUserScrolling = true;
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        this.isUserScrolling = false;
-      }, 2000);
+    // 删除原有的滚动事件监听器
+    // 添加鼠标进入和离开事件监听器
+    this.element.addEventListener('mouseenter', () => {
+      this.isMouseOver = true;
+    });
+    this.element.addEventListener('mouseleave', () => {
+      this.isMouseOver = false;
     });
   }
 
@@ -174,7 +174,7 @@ class TranscriptViewer {
         }
       });
 
-      if (activeParagraph && !this.isUserScrolling) {
+      if (activeParagraph && !this.isMouseOver) {
         this.scrollToActiveParagraph(activeParagraph);
       }
     }
