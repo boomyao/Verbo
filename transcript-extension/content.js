@@ -75,7 +75,7 @@ class TranscriptViewer {
               ${(paragraph.lines || []).map(line => `
                 <span class="verbo-sentence" data-start="${line.start}" data-end="${line.end}">${line.text}</span>
               `).join('')}
-              ${!(paragraph.lines || []).length && paragraph.text}
+              ${!(paragraph.lines || []).length ? paragraph.text : ''}
             </p>
             ${paragraph.translated_text ?
               `<p class="verbo-translated-text">
@@ -84,7 +84,7 @@ class TranscriptViewer {
                     ${line.translated_text || ''}
                   </span>
                 `).join('')}
-                ${!(paragraph.lines || []).length && paragraph.translated_text}
+                ${!(paragraph.lines || []).length ? paragraph.translated_text : ''}
               </p>` :
               `<p class="verbo-loading-icon"></p>`
             }
@@ -152,7 +152,6 @@ class TranscriptViewer {
           translatedText && (translatedText.style.fontWeight = 'bold');
           activeParagraph = p;
 
-          // 高亮当前句子及其翻译
           const sentences = p.querySelectorAll('.verbo-sentence, .verbo-translated-sentence');
           sentences.forEach(sentence => {
             const sentenceStart = parseFloat(sentence.dataset.start);
@@ -204,6 +203,7 @@ class TranscriptControls {
   constructor() {
     this.element = document.createElement('div');
     this.element.className = 'verbo-transcript-controls';
+    this.isLoading = false;
   }
 
   render() {
@@ -241,14 +241,39 @@ class TranscriptControls {
         <button id="${button.id}">${button.text}</button>
       `).join('')}
     `;
+
+    this.element.innerHTML += `
+      <style>
+        .verbo-transcript-controls button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      </style>
+    `;
   }
 
   setupEventListeners() {
     this.element.querySelectorAll('button').forEach(button => {
       button.addEventListener('click', () => {
-        const event = new CustomEvent(button.id, { bubbles: true });
-        this.element.dispatchEvent(event);
+        if (!this.isLoading) {
+          this.setLoading(true);
+          const event = new CustomEvent(button.id, { bubbles: true });
+          this.element.dispatchEvent(event);
+        }
       });
+    });
+  }
+
+  setLoading(isLoading) {
+    this.isLoading = isLoading;
+    const buttons = this.element.querySelectorAll('button');
+    buttons.forEach(button => {
+      button.disabled = isLoading;
+      if (isLoading) {
+        button.innerHTML += ' <span class="verbo-loading-icon"></span>';
+      } else {
+        button.innerHTML = button.innerHTML.replace(/ <span class="verbo-loading-icon"><\/span>/, '');
+      }
     });
   }
 }
@@ -299,25 +324,32 @@ function formatTime(seconds) {
 }
 
 async function detailedTranslate() {
-  const video_id = location.href.split("v=")[1].split("&")[0];
-  const paragraphs = await apiService.getTranscript(video_id);
-  transcriptViewer.updateTranscript(paragraphs);
+  try {
+    const video_id = location.href.split("v=")[1].split("&")[0];
+    const paragraphs = await apiService.getTranscript(video_id);
+    transcriptViewer.updateTranscript(paragraphs);
+  } finally {
+    transcriptControls.setLoading(false);
+  }
 }
 
-
 async function quickTranslate() {
-  const batchSize = 10;
-  const video_id = location.href.split("v=")[1].split("&")[0];
-  const paragraphs = await apiService.getYtTranscript(video_id);
-  transcriptViewer.updateTranscript(paragraphs);
-  for (let i = 0; i < paragraphs.length; i += batchSize) {
-    const batch = paragraphs.slice(i, i + batchSize);
-    const promises = batch.map(paragraph => apiService.directTranslate(paragraph.text));
-    const results = await Promise.all(promises);
-    batch.forEach((paragraph, index) => {
-      paragraph.translated_text = results[index].translated_text;
-    });
+  try {
+    const batchSize = 10;
+    const video_id = location.href.split("v=")[1].split("&")[0];
+    const paragraphs = await apiService.getYtTranscript(video_id);
     transcriptViewer.updateTranscript(paragraphs);
+    for (let i = 0; i < paragraphs.length; i += batchSize) {
+      const batch = paragraphs.slice(i, i + batchSize);
+      const promises = batch.map(paragraph => apiService.directTranslate(paragraph.text));
+      const results = await Promise.all(promises);
+      batch.forEach((paragraph, index) => {
+        paragraph.translated_text = results[index].translated_text;
+      });
+      transcriptViewer.updateTranscript(paragraphs);
+    }
+  } finally {
+    transcriptControls.setLoading(false);
   }
 }
 
