@@ -39,6 +39,9 @@ def transcribe_audio(audio_path: str, hotwords: List[str] = []):
   diarize_segments = diarize_model(audio)
 
   result = whisperx.assign_word_speakers(diarize_segments, result)
+  for segment in result["segments"]:
+    if not segment["speaker"]:
+      segment["speaker"] = None
   end_time = time.time()
   logger.debug(f"Assigned speakers in {end_time - start_time} seconds")
 

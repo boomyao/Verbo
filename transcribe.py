@@ -15,7 +15,8 @@ def save_paragraphs(paragraphs, path):
         "end": paragraph["lines"][-1]["end"],
         "text": paragraph["text"],
         "translated_text": paragraph.get("translated_text", ""),
-        "lines": paragraph.get("lines", [])
+        "lines": paragraph.get("lines", []),
+        "speaker": paragraph.get("speaker", ""),
       }, ensure_ascii=False) + "\n")
 
 def run_steps(yt_url: str, output_dir: str, should_align: bool = False):
