@@ -21,23 +21,29 @@ def split_paragraphs_by_limit(transcription_lines, paragraph_length=1000):
 
     return paragraphs
 
-def split_paragraphs_by_speaker(transcription_lines):
+def split_paragraphs_by_speaker(transcription_lines, length_threshold=None):
     paragraphs = []
     current_text = ""
     current_lines = []
     current_speaker = None
+    
+    def add_paragraph():
+        paragraphs.append({ "text": current_text.strip(), "lines": current_lines })
+    
     for line in transcription_lines:
-        if line["speaker"] != current_speaker:
-            if current_speaker is not None:
-                paragraphs.append({ "text": current_text, "lines": current_lines })
+        if line["speaker"] != current_speaker or (length_threshold and len(current_text) + len(line["text"]) > length_threshold):
+            if current_text:
+                add_paragraph()
             current_text = line["text"]
             current_lines = [line]
             current_speaker = line["speaker"]
         else:
-            current_text += line["text"] + " "
+            current_text += " " + line["text"]
             current_lines.append(line)
-    if len(current_text) > 0:
-        paragraphs.append({ "text": current_text, "lines": current_lines })
+    
+    if current_text:
+        add_paragraph()
+    
     return paragraphs
 
 def split_paragraphs(transcription_file=None, transcription_lines=None, paragraph_length=1000, output_file=None):
