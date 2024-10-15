@@ -16,54 +16,55 @@ def get_transcription_lines(transcription_file, start_line=0, end_line=None):
     else:
         return [json.loads(line) for line in transcription[start_line:end_line]]
 
-def align_translated(sentences, translated, max_retry=3):
+def align_translated(sentences, translated):
     sentences_str = ""
     for sentence in sentences:
-        sentences_str += json.dumps(sentence, ensure_ascii=False) + "\n"
+        sentences_str += '"{}"\n'.format(sentence["text"])
     client = OpenAI()
     user_content = """
-Please align the translated Chinese content with the time-stamped data below based on the meaning of each sentence, following these specific requirements:
+Task: Please align the translated Chinese content with the following English sentences based on sentence order, following these specific requirements:
 
 Alignment:
 
-Sentence-by-Sentence Comparison: For each English sentence in the timestamps, find the most semantically matching part in the translated Chinese content.
-Sentence Splitting or Merging: If the sentence structure in Chinese differs from the English version, appropriately split or merge the Chinese content to match the timestamps.
-Ensure Consistent Meaning: Regardless of sentence structure changes, make sure that the Chinese text in each timestamp conveys the same meaning as the corresponding English text.
-Replace Text:
-
-Replace the "text" Field: Replace the "text" field in each timestamped data with the corresponding Chinese translation.
-Preserve Structure:
-
-Keep "start" and "end" Fields Unchanged: Only replace the content of the "text" field; keep the other fields as they are.
+Sentence Order Matching: Match each English sentence with the corresponding Chinese sentence in order.
+Sentence Splitting or Merging: If the Chinese sentence structure differs from the English, appropriately split or merge the Chinese content to match the number of English sentences.
+Ensure Consistent Meaning: Regardless of structural changes, ensure that each Chinese sentence conveys the same meaning as the corresponding English sentence.
 Output Format:
 
-Output in JSON Format:
+JSON Format:
 {{
-  "aligned_data": [
-    {{"start": number, "end": number, "text": "<chinese_text>"}},
+  "aligned_sentences": [
+    {{"english": "<English sentence>", "chinese": "<Chinese translation>"}},
     ...
   ]
 }}
 Example:
-English Timestamp:
-{{"start": 0.0, "end": 5.0, "text": "Hello world."}}
+
+English Sentences:
+
+"Hello world."
+"This is a sample."
 Translated Chinese Content:
-大家好，这是一个示例。
+
+"大家好，这是一个示例。"
+
 Aligned Result:
 {{
-  "aligned_data": [
-    {{"start": 0.0, "end": 5.0, "text": "大家好。"}}
+  "aligned_sentences": [
+    {{"english": "Hello world.", "chinese": "大家好。"}},
+    {{"english": "This is a sample.", "chinese": "这是一个示例。"}}
   ]
 }}
+Translated Chinese Content:
 
-### Translated Chinese Content:
 {translated}
 
-### Time-Stamped Data to Align:
+English Sentences to Align:
+
 {sentences_str}
 """.format(sentences_str=sentences_str, translated=translated)
     response = client.chat.completions.create(
-        model= 'gpt-4o-mini' if max_retry > 0 else 'gpt-4o',
+        model= 'gpt-4o-mini',
         messages=[
             {"role": "system", "content": 'You are a helpful assistant.'},
             {"role": "user", "content": user_content}
@@ -74,21 +75,28 @@ Aligned Result:
         response_format={ "type": "json_object" }
     )
     result = response.choices[0].message.content
-    lines = json_repair.loads(result)["aligned_data"]
-    lines = [{"start": line["start"], "end": line["end"], "text": line["text"]} for line in lines if line["text"] != ""]
-    if len(lines) != len(sentences):
-        if max_retry > 0:
-            print("align_translated failed, retry with repair_aligned_translated.")
-            print(lines)
-            return align_translated(sentences, translated, max_retry - 1)
-        else:
-            print(user_content)
-            print(lines)
-            raise Exception("aligned items count not match!\n"
-                            "sentences: {}\n"
-                            "lines: {}".format(len(sentences), len(lines)))
-
-    return lines
+    aligned_sentences = json_repair.loads(result)["aligned_sentences"]
+    if len(aligned_sentences) != len(sentences):
+        # repair aligned_sentences
+        repaired_aligned_sentences = []
+        aligned_index = 0
+        
+        for i, sentence in enumerate(sentences):
+            if aligned_index < len(aligned_sentences) and aligned_sentences[aligned_index]["english"].strip() == sentence["text"].strip():
+                repaired_aligned_sentences.append(aligned_sentences[aligned_index])
+                aligned_index += 1
+            else:
+                direct_translation = direct_translate_text(sentence["text"])
+                repaired_aligned_sentences.append({
+                    "english": sentence["text"],
+                    "chinese": direct_translation
+                })
+        
+        aligned_sentences = repaired_aligned_sentences
+    
+    for i in range(len(sentences)):
+        sentences[i]["translated_text"] = aligned_sentences[i]["chinese"]
+    return sentences
 
 def direct_translate_text(text, model='gpt-4o-mini', base_url=None, api_key=None):
     client = OpenAI(base_url=base_url, api_key=api_key)
@@ -121,7 +129,7 @@ You are a translation assistant. Translate the Input Content into Chinese and ou
         result = result[1:]
     return result
 
-def translate_text(text, max_retry=3):
+def translate_text(text):
     if len(text) < 20:
         return direct_translate_text(text)
     client = OpenAI(api_key=os.getenv("GLM_API_KEY"), base_url=os.getenv("GLM_BASE_URL"))
@@ -190,13 +198,9 @@ Remember to consistently use the provided glossary for technical terms throughou
             result = result[1:]
         return result
     except Exception as e:
-        if max_retry > 0:
-            logger.error(e, exc_info=True)
-            return translate_text(text, max_retry - 1)
-        else:
-            logger.error(user_content)
-            logger.error(result)
-            raise e
+        logger.error(user_content)
+        logger.error(result)
+        raise e
 
 def translate(transcription_file, paragraph_length=1000, output_file=None, max_workers=10):
     transcription_lines = get_transcription_lines(transcription_file)
@@ -229,16 +233,30 @@ def translate(transcription_file, paragraph_length=1000, output_file=None, max_w
     else:
         return paragraphs
 
-def align_translated_paragraphs(translated_paragraphs, output_file=None):
+def align_translated_paragraphs(translated_paragraphs, output_file=None, max_workers=10):
     list_aligned = []
-    with tqdm(total=len(translated_paragraphs), desc="Aligning translated paragraphs") as pbar:
-        for paragraph in translated_paragraphs:
-            aligned = align_translated(paragraph["lines"], paragraph["translated_text"])
-            for line in aligned:
-                list_aligned.append(line)
-            pbar.update(1)
+    
+    def process_paragraph(paragraph):
+        if len(paragraph["lines"]) == 0:
+            return []
+        elif len(paragraph["lines"]) == 1:
+            paragraph["lines"][0]["translated_text"] = paragraph["translated_text"]
+            return paragraph["lines"]
+        else:
+            return align_translated(paragraph["lines"], paragraph["translated_text"])
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_paragraph, paragraph) for paragraph in translated_paragraphs]
+        
+        with tqdm(total=len(translated_paragraphs), desc="Aligning translated paragraphs") as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                aligned = future.result()
+                for line in aligned:
+                    list_aligned.append(line)
+                pbar.update(1)
 
     list_aligned.sort(key=lambda x: x["start"])
+    
     if output_file is not None:
         with open(output_file, "w", encoding="utf-8") as f:
             for aligned in list_aligned:

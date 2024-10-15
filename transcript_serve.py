@@ -19,7 +19,7 @@ def get_translated_transcript(video_id):
     output_dir = f"{BASE_DIR}/{video_id}"
     if not os.path.exists(output_dir) or not os.path.exists(f"{output_dir}/translated_paragraphs.jsonl"):
         url = f"https://www.youtube.com/watch?v={video_id}"
-        run_steps(url, output_dir)
+        run_steps(url, output_dir, should_align=True)
     paragraphs = []
     with open(f"{output_dir}/translated_paragraphs.jsonl", "r", encoding="utf-8") as f:
         for line in f:

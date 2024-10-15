@@ -2,11 +2,23 @@ from tools.download import download_audio_only
 import argparse
 import json
 import os
-from tools.translate import translate
+from tools.translate import translate, align_translated_paragraphs
 from tools.download import get_video_info
 from tools.transcribe_speaker import transcribe_audio
 from tools.transcribe import get_hotwords_from_video_info
-def run_steps(yt_url: str, output_dir: str):
+
+def save_paragraphs(paragraphs, path):
+  with open(path, "w", encoding="utf-8") as f:
+    for paragraph in paragraphs:
+      f.write(json.dumps({
+        "start": paragraph["lines"][0]["start"],
+        "end": paragraph["lines"][-1]["end"],
+        "text": paragraph["text"],
+        "translated_text": paragraph.get("translated_text", ""),
+        "lines": paragraph.get("lines", [])
+      }, ensure_ascii=False) + "\n")
+
+def run_steps(yt_url: str, output_dir: str, should_align: bool = False):
   print(f"Downloading audio from {yt_url}")
   original_audio_path = download_audio_only(yt_url, output_dir)
 
@@ -45,14 +57,21 @@ def run_steps(yt_url: str, output_dir: str):
   translated_paragraphs_path = os.path.join(base_dir, "translated_paragraphs.jsonl")
   if not os.path.exists(translated_paragraphs_path):
     translated_paragraphs = translate(transcription_jsonl_path)
-    with open(translated_paragraphs_path, "w", encoding="utf-8") as f:
-      for paragraph in translated_paragraphs:
-        f.write(json.dumps({
-          "start": paragraph["lines"][0]["start"],
-          "end": paragraph["lines"][-1]["end"],
-          "text": paragraph["text"],
-          "translated_text": paragraph.get("translated_text", "")
-        }, ensure_ascii=False) + "\n")
+    save_paragraphs(translated_paragraphs, translated_paragraphs_path)
+  else:
+    with open(translated_paragraphs_path, encoding="utf-8") as f:
+      translated_paragraphs = [json.loads(line) for line in f.readlines()]
+
+  if should_align:
+    print(f"Aligning translated paragraphs")
+    aligned_lines = align_translated_paragraphs(translated_paragraphs)
+    aligned_map = {}
+    for line in aligned_lines:
+      aligned_map[line["start"]] = line
+    for paragraph in translated_paragraphs:
+      for line in paragraph["lines"]:
+        line["translated_text"] = aligned_map[line["start"]]["translated_text"]
+    save_paragraphs(translated_paragraphs, translated_paragraphs_path)
 
   print(f"Done")
 
