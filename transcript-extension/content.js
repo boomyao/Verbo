@@ -77,7 +77,17 @@ class TranscriptViewer {
               `).join('')}
               ${!(paragraph.lines || []).length && paragraph.text}
             </p>
-            ${paragraph.translated_text ? ` <p class="verbo-translated-text">${paragraph.translated_text}</p>` : `<p class="verbo-loading-icon"></p>`}
+            ${paragraph.translated_text ?
+              `<p class="verbo-translated-text">
+                ${(paragraph.lines || []).map(line => `
+                  <span class="verbo-translated-sentence" data-start="${line.start}" data-end="${line.end}">
+                    ${line.translated_text || ''}
+                  </span>
+                `).join('')}
+                ${!(paragraph.lines || []).length && paragraph.translated_text}
+              </p>` :
+              `<p class="verbo-loading-icon"></p>`
+            }
           </div>`;
       }).join('')}
     `;
@@ -142,8 +152,8 @@ class TranscriptViewer {
           translatedText && (translatedText.style.fontWeight = 'bold');
           activeParagraph = p;
 
-          // 高亮当前句子
-          const sentences = p.querySelectorAll('.verbo-sentence');
+          // 高亮当前句子及其翻译
+          const sentences = p.querySelectorAll('.verbo-sentence, .verbo-translated-sentence');
           sentences.forEach(sentence => {
             const sentenceStart = parseFloat(sentence.dataset.start);
             const sentenceEnd = parseFloat(sentence.dataset.end);
@@ -157,8 +167,8 @@ class TranscriptViewer {
           originalText && (originalText.style.fontWeight = 'normal');
           translatedText && (translatedText.style.fontWeight = 'normal');
           
-          // 清除非活动段落的句子高亮
-          const sentences = p.querySelectorAll('.verbo-sentence');
+          // 清除非活动段落的句子高亮（包括翻译）
+          const sentences = p.querySelectorAll('.verbo-sentence, .verbo-translated-sentence');
           sentences.forEach(sentence => {
             sentence.style.backgroundColor = 'transparent';
           });
