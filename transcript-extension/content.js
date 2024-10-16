@@ -79,12 +79,12 @@ class TranscriptViewer {
             </p>
             ${paragraph.translated_text ?
               `<p class="verbo-translated-text">
-                ${(paragraph.lines || []).map(line => `
+                ${(paragraph.lines || []).filter(line => line.translated_text).map(line => `
                   <span class="verbo-translated-sentence" data-start="${line.start}" data-end="${line.end}">
                     ${line.translated_text || ''}
                   </span>
                 `).join('')}
-                ${!(paragraph.lines || []).length ? paragraph.translated_text : ''}
+                ${!(paragraph.lines || []).filter(line => line.translated_text).length ? paragraph.translated_text : ''}
               </p>` :
               `<p class="verbo-loading-icon"></p>`
             }
