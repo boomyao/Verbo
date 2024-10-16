@@ -25,26 +25,39 @@
 - [ ] **云端共享平台**
 
 ## Demo
+<table>
+<tr>
+<td width="50%">
+
+### 视频翻译配音
+---
+https://github.com/user-attachments/assets/548e7192-d80b-4051-b4de-90d03c244bd4
+
+</td>
+<td width="50%">
+
+### 高阶字幕(多人发言)
+---
+https://github.com/user-attachments/assets/93a08ecf-f3c6-43c1-b703-e4776a6dd2ce
+
+</td>
+</tr>
+</table>
 
 ## Getting Started
 
 要开始使用 Verbo，请按照以下步骤操作：
 
-1. 克隆此仓库：
+1. 视频翻译配音
    ```sh
-   git clone https://github.com/yourusername/verbo.git
+   python translate_video.py -i <video_file> -o <output_dir>
    ```
-2. 进入项目目录：
+2. Youtube 高阶字幕
    ```sh
-   cd verbo
-   ```
-3. 安装依赖：
-   ```sh
-   npm install
-   ```
-4. 运行应用：
-   ```sh
-   npm start
+   # 启动服务
+   python transcript_serve.py
+
+   # 加载浏览器插件(transcript-extension)
    ```
 
 ## Concept
