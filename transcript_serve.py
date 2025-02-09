@@ -5,7 +5,7 @@ import json
 from transcribe import run_steps
 from tools.transcribe import get_transcript_from_youtube
 from tools.paragraph import split_paragraphs_by_limit
-from tools.translate import direct_translate_text
+from tools.agent import agentTranslator
 
 app = Flask(__name__)
 CORS(app)
@@ -17,9 +17,8 @@ if not os.path.exists(BASE_DIR):
 
 def get_translated_transcript(video_id):
     output_dir = f"{BASE_DIR}/{video_id}"
-    if not os.path.exists(output_dir) or not os.path.exists(f"{output_dir}/translated_paragraphs.jsonl"):
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        run_steps(url, output_dir, should_align=True)
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    run_steps(url, output_dir, should_align=True)
     paragraphs = []
     with open(f"{output_dir}/translated_paragraphs.jsonl", "r", encoding="utf-8") as f:
         for line in f:
@@ -53,7 +52,7 @@ def get_transcript_yt(video_id):
 def translate_direct():
     data = request.json
     text = data.get("text")
-    translated_text = direct_translate_text(text, model="glm-4-flash", base_url=os.getenv("GLM_BASE_URL"), api_key=os.getenv("GLM_API_KEY"))
+    translated_text = agentTranslator(text)
     return jsonify({"translated_text": translated_text})
 
 if __name__ == '__main__':

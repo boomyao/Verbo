@@ -20,8 +20,14 @@ def save_paragraphs(paragraphs, path):
       }, ensure_ascii=False) + "\n")
 
 def run_steps(yt_url: str, output_dir: str, should_align: bool = False):
-  print(f"Downloading audio from {yt_url}")
-  original_audio_path = download_audio_only(yt_url, output_dir)
+  if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+  if not os.path.exists(os.path.join(output_dir, "original.wav")):
+    print(f"Downloading audio from {yt_url}")
+    original_audio_path = download_audio_only(yt_url, output_dir)
+  else:
+    original_audio_path = os.path.join(output_dir, "original.wav")
 
   base_dir = os.path.dirname(original_audio_path)
 
@@ -56,6 +62,7 @@ def run_steps(yt_url: str, output_dir: str, should_align: bool = False):
 
   print(f"Translating to paragraphs")
   translated_paragraphs_path = os.path.join(base_dir, "translated_paragraphs.jsonl")
+  translated_paragraphs = []
   if not os.path.exists(translated_paragraphs_path):
     translated_paragraphs = translate(transcription_jsonl_path)
     save_paragraphs(translated_paragraphs, translated_paragraphs_path)
@@ -63,7 +70,7 @@ def run_steps(yt_url: str, output_dir: str, should_align: bool = False):
     with open(translated_paragraphs_path, encoding="utf-8") as f:
       translated_paragraphs = [json.loads(line) for line in f.readlines()]
 
-  if should_align:
+  if should_align and translated_paragraphs[0].get("lines", [])[0].get("translated_text", "") == "":
     print(f"Aligning translated paragraphs")
     aligned_lines = align_translated_paragraphs(translated_paragraphs)
     aligned_map = {}
